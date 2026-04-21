@@ -73,6 +73,14 @@ export interface I18nVitePluginOptions {
    * @default false
    */
   syncLocales?: "update" | "check" | false;
+  /**
+   * Locale codes to ensure exist as JSON files in `localesDir`.
+   * When `syncLocales` is `"update"` and a listed locale has no file yet,
+   * the plugin creates an empty stub and immediately populates it with all
+   * extracted source strings as untranslated placeholders.
+   * @example ["en", "da", "de"]
+   */
+  locales?: string[];
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -200,6 +208,7 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     emitManifest = false,
     manifestPath = "dist/i18n-manifest.json",
     syncLocales = false,
+    locales: declaredLocales,
   } = options;
 
   let root = process.cwd();
@@ -242,9 +251,25 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
       srcDir = path.join(root, "src");
     },
 
-    buildStart() {
+        buildStart() {
       if (syncLocales) {
         const sourceMessages = extractSourceMessages(srcDir);
+
+        // Bootstrap any declared locale files that don't exist yet
+        if (syncLocales === "update" && declaredLocales?.length) {
+          const absLocalesDir = path.isAbsolute(localesDir)
+            ? localesDir
+            : path.join(root, localesDir);
+          fs.mkdirSync(absLocalesDir, { recursive: true });
+          for (const locale of declaredLocales) {
+            const filePath = path.join(absLocalesDir, `${locale}.json`);
+            if (!fs.existsSync(filePath)) {
+              fs.writeFileSync(filePath, "{}\n", "utf-8");
+              console.info(`[i18n] Created ${path.relative(root, filePath)}`);
+            }
+          }
+        }
+
         const localeFiles = resolveLocaleFiles(localesDir, root);
         syncLocaleFiles(
           sourceMessages,
@@ -281,7 +306,7 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
       const filePath = localeFiles.get(locale);
 
       if (!filePath) {
-        this.warn(`[i18n] No translation file found for locale "${locale}"`);
+        console.warn(`[i18n] No translation file found for locale "${locale}"`);
         return `export default {};`;
       }
 
