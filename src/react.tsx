@@ -133,7 +133,7 @@ export function I18nProvider({ config, locale: localeProp, children, fallback }:
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-const isDev = typeof process !== "undefined" && process.env?.NODE_ENV !== "production";
+const isDev = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !== "production";
 
 export function useTranslation() {
   const ctx = useContext(I18nContext);
@@ -235,7 +235,7 @@ export interface TProps {
 }
 
 export function T({ children, ...values }: TProps): ReactNode {
-  const { t, locale, messages } = (() => {
+  const { locale, messages } = (() => {
     const ctx = useContext(I18nContext);
     if (!ctx) throw new Error("<T> must be used inside <I18nProvider>");
     return ctx;
