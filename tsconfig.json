@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "target": "ES2020",
-        "module": "ESNext",
+        "module": "preserve",
         "lib": ["ES2021", "DOM", "DOM.Iterable"],
         "jsx": "react-jsx",
         "declaration": true,
@@ -10,10 +10,11 @@
         "outDir": "./dist",
         "rootDir": "./src",
         "strict": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "esModuleInterop": true,
         "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true
+        "forceConsistentCasingInFileNames": true,
+        "types": ["node", "vite/client"]
     },
     "include": ["src"],
     "exclude": ["node_modules", "dist", "example"]

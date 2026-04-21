@@ -1,0 +1,55 @@
+/**
+ * Vite plugin for react-i18labels
+ *
+ * Compiles translation JSON files into virtual locale modules at build time
+ * and during HMR in development.  The compiled modules are what
+ * `loadLocale` dynamically imports at runtime.
+ *
+ * Setup in vite.config.ts:
+ *
+ *   import i18nLabels from "react-i18labels/vite-plugin";
+ *
+ *   export default defineConfig({
+ *     plugins: [
+ *       i18nLabels({ localesDir: "./locales" }),
+ *     ],
+ *   });
+ *
+ * Setup in your app's i18n config:
+ *
+ *   loadLocale: (locale) => import(`virtual:i18n/${locale}`)
+ */
+import type { Plugin } from "vite";
+export interface I18nVitePluginOptions {
+    /**
+     * Directory (or glob) containing translation JSON files.
+     * Each file must be named `<locale>.json` (e.g. `da.json`, `en.json`).
+     * @example "./locales"
+     * @example "./src/locales/*.json"
+     */
+    localesDir: string;
+    /**
+     * Locale used as the reference/source language.  Its keys become the
+     * canonical set of source strings.
+     * @default "en"
+     */
+    sourceLocale?: string;
+    /**
+     * Emit console warnings for missing translation keys during build.
+     * @default true
+     */
+    warnOnMissing?: boolean;
+    /**
+     * Write an extraction manifest (list of all source strings) to disk
+     * so CI / translators can diff what's missing.
+     * @default false
+     */
+    emitManifest?: boolean;
+    /**
+     * Output path for the manifest file.
+     * @default "dist/i18n-manifest.json"
+     */
+    manifestPath?: string;
+}
+export default function i18nLabels(options: I18nVitePluginOptions): Plugin;
+//# sourceMappingURL=vite-plugin.d.ts.map
