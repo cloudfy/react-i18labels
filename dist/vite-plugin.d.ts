@@ -50,6 +50,21 @@ export interface I18nVitePluginOptions {
      * @default "dist/i18n-manifest.json"
      */
     manifestPath?: string;
+    /**
+     * Keep locale JSON files in sync with the source strings extracted from your
+     * TypeScript/TSX files.
+     *
+     * - `"update"` — Add missing keys (empty placeholder value) and write the
+     *   updated JSON back to disk.  Safe for local development and CI pipelines
+     *   that commit the result.  Existing translations are never touched.
+     * - `"check"`  — Fail the build when any locale is missing keys.  Use this
+     *   in CI to enforce that translation files are always up-to-date before
+     *   merging.
+     * - `false`    — Do nothing (default, preserves previous behaviour).
+     *
+     * @default false
+     */
+    syncLocales?: "update" | "check" | false;
 }
 export default function i18nLabels(options: I18nVitePluginOptions): Plugin;
 //# sourceMappingURL=vite-plugin.d.ts.map

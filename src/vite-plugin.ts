@@ -58,6 +58,21 @@ export interface I18nVitePluginOptions {
    * @default "dist/i18n-manifest.json"
    */
   manifestPath?: string;
+  /**
+   * Keep locale JSON files in sync with the source strings extracted from your
+   * TypeScript/TSX files.
+   *
+   * - `"update"` — Add missing keys (empty placeholder value) and write the
+   *   updated JSON back to disk.  Safe for local development and CI pipelines
+   *   that commit the result.  Existing translations are never touched.
+   * - `"check"`  — Fail the build when any locale is missing keys.  Use this
+   *   in CI to enforce that translation files are always up-to-date before
+   *   merging.
+   * - `false`    — Do nothing (default, preserves previous behaviour).
+   *
+   * @default false
+   */
+  syncLocales?: "update" | "check" | false;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -121,6 +136,60 @@ function extractSourceMessages(srcDir: string): string[] {
   return [...messages];
 }
 
+// ─── Sync helper ─────────────────────────────────────────────────────────────
+
+/**
+ * Synchronise locale JSON files against the current set of source strings.
+ *
+ * "update" mode  — writes missing keys (empty string placeholder) back to
+ *   disk.  Existing translations are preserved.  Stale keys are left in place
+ *   so translators can review them manually.
+ *
+ * "check" mode   — throws an error listing every missing key so the build
+ *   fails fast in CI.
+ */
+function syncLocaleFiles(
+  sourceMessages: string[],
+  localeFiles: Map<string, string>,
+  mode: "update" | "check",
+  root: string,
+  onError: (msg: string) => void,
+  onInfo: (msg: string) => void,
+): void {
+  const allMissing: Array<{ locale: string; keys: string[] }> = [];
+
+  for (const [locale, filePath] of localeFiles) {
+    const existing = readTranslationFile(filePath);
+    const missingKeys = sourceMessages.filter((m) => !(m in existing));
+    if (missingKeys.length === 0) continue;
+    allMissing.push({ locale, keys: missingKeys });
+
+    if (mode === "update") {
+      const updated = { ...existing };
+      for (const key of missingKeys) {
+        updated[key] = ""; // empty string flags it as needing translation
+      }
+      fs.writeFileSync(filePath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
+      onInfo(
+        `[i18n] "${locale}": added ${missingKeys.length} missing key(s) → ${path.relative(root, filePath)}`,
+      );
+    }
+  }
+
+  if (mode === "check" && allMissing.length > 0) {
+    const detail = allMissing
+      .map(
+        ({ locale, keys }) =>
+          `  Locale "${locale}" — ${keys.length} missing key(s):\n` +
+          keys.map((k) => `    • ${JSON.stringify(k)}`).join("\n"),
+      )
+      .join("\n");
+    onError(
+      `[i18n] Translation sync failed. Run the build with syncLocales: "update" to fix automatically.\n${detail}`,
+    );
+  }
+}
+
 // ─── Plugin ───────────────────────────────────────────────────────────────────
 
 export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
@@ -130,6 +199,7 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     warnOnMissing = true,
     emitManifest = false,
     manifestPath = "dist/i18n-manifest.json",
+    syncLocales = false,
   } = options;
 
   let root = process.cwd();
@@ -173,8 +243,21 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     },
 
     buildStart() {
+      if (syncLocales) {
+        const sourceMessages = extractSourceMessages(srcDir);
+        const localeFiles = resolveLocaleFiles(localesDir, root);
+        syncLocaleFiles(
+          sourceMessages,
+          localeFiles,
+          syncLocales,
+          root,
+          (msg) => { throw new Error(msg); },
+          (msg) => console.info(msg),
+        );
+      }
       compileAll();
     },
+
 
     // ── Virtual module resolution ─────────────────────────────────────────────
 
@@ -210,25 +293,50 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     configureServer(server: ViteDevServer) {
       const localeFiles = resolveLocaleFiles(localesDir, root);
 
-      for (const [locale, filePath] of localeFiles) {
+      // Watch locale JSON files
+      for (const [, filePath] of localeFiles) {
         server.watcher.add(filePath);
       }
 
-      server.watcher.on("change", (changedPath: string) => {
-        // Check if the changed file is one of our translation files
-        for (const [locale, filePath] of resolveLocaleFiles(localesDir, root)) {
-          if (path.resolve(changedPath) === filePath) {
-            compile(locale, filePath);
+      // Watch source TS/TSX files so new t() calls sync immediately in dev
+      if (syncLocales === "update") {
+        server.watcher.add(path.join(srcDir, "**/*.{ts,tsx}"));
+      }
 
-            // Invalidate the virtual module so Vite triggers a re-import
+      server.watcher.on("change", (changedPath: string) => {
+        const resolvedChanged = path.resolve(changedPath);
+        const currentLocaleFiles = resolveLocaleFiles(localesDir, root);
+
+        // ── A translation JSON file changed ──────────────────────────────────
+        for (const [locale, filePath] of currentLocaleFiles) {
+          if (resolvedChanged === filePath) {
+            compile(locale, filePath);
             const moduleId = RESOLVED_PREFIX + locale;
             const mod = server.moduleGraph.getModuleById(moduleId);
             if (mod) {
               server.moduleGraph.invalidateModule(mod);
               server.hot.send({ type: "full-reload" });
             }
-            break;
+            return;
           }
+        }
+
+        // ── A source file changed — sync new keys then recompile ─────────────
+        if (syncLocales === "update" && /\.(tsx?)$/.test(changedPath)) {
+          const sourceMessages = extractSourceMessages(srcDir);
+          syncLocaleFiles(
+            sourceMessages,
+            currentLocaleFiles,
+            "update",
+            root,
+            (msg) => console.error(msg),
+            (msg) => console.info(msg),
+          );
+          // Recompile all locales (JSON files may have been updated on disk)
+          for (const [locale, filePath] of currentLocaleFiles) {
+            compile(locale, filePath);
+          }
+          server.hot.send({ type: "full-reload" });
         }
       });
     },

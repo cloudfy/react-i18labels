@@ -189,6 +189,7 @@ The plugin resolves each `virtual:i18n/<locale>` import to the compiled output o
 | `warnOnMissing` | `boolean` | `true` | Log a warning when a locale has untranslated keys. |
 | `emitManifest` | `boolean` | `false` | Write a `i18n-manifest.json` with all extracted strings and per-locale missing counts. |
 | `manifestPath` | `string` | `"dist/i18n-manifest.json"` | Output path for the manifest file. |
+| `syncLocales` | `"update" \| "check" \| false` | `false` | Automatically keep locale JSON files in sync with source strings (see below). |
 
 ### Manifest file
 
@@ -204,6 +205,33 @@ When `emitManifest: true` is set, the plugin writes a JSON file at build time th
     "de": { "total": 42, "missing": 3 }
   }
 }
+```
+
+### Locale sync (`syncLocales`)
+
+The plugin can keep your `locales/*.json` files in sync with the strings extracted from your source code automatically — no manual extraction step needed.
+
+```ts
+i18nLabels({
+  localesDir: "./locales",
+  syncLocales: "update", // recommended for local development
+})
+```
+
+| Value | Behaviour |
+|---|---|
+| `"update"` | Scans `src/**/*.{ts,tsx}` at build start for `t()` / `<T>` calls. Adds any missing keys to each locale JSON file with an empty string placeholder. Existing translations are never touched. In dev mode, also watches source files — saving a file with a new `t()` call instantly updates the JSONs and triggers HMR. |
+| `"check"` | Same scan, but **fails the build** if any locale is missing keys. Use this in CI to enforce that translation files are always committed and up-to-date. |
+| `false` | Do nothing (default). |
+
+**Recommended setup:**
+
+```ts
+// vite.config.ts
+i18nLabels({
+  localesDir: "./locales",
+  syncLocales: process.env.CI ? "check" : "update",
+})
 ```
 
 ---
