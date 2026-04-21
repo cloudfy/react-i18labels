@@ -87,8 +87,35 @@ export interface I18nVitePluginOptions {
 
 const VIRTUAL_PREFIX = "virtual:i18n/";
 const RESOLVED_PREFIX = "\0virtual:i18n/";
+const LOADER_VIRTUAL = "virtual:i18n/loader";
+const LOADER_RESOLVED = "\0virtual:i18n/loader";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Generate a loader module with one static import per locale.
+ * Vite can rewrite static `import("virtual:i18n/...")` calls correctly;
+ * template-literal dynamic imports resolve to a bare URL which the browser
+ * cannot fetch (CorsDisabledScheme).  This module is the fix.
+ */
+function generateLoaderCode(localeFiles: Map<string, string>): string {
+  const entries = [...localeFiles.keys()]
+    .map((l) => `  ${JSON.stringify(l)}: () => import("virtual:i18n/${l}")`)
+    .join(",\n");
+  return [
+    `const _locales = {`,
+    entries,
+    `};`,
+    `export default function loadLocale(locale) {`,
+    `  const loader = _locales[locale];`,
+    `  if (!loader) {`,
+    `    console.warn('[i18n] No locale module for "' + locale + '"');`,
+    `    return Promise.resolve({ default: {} });`,
+    `  }`,
+    `  return loader();`,
+    `}`,
+  ].join("\n");
+}
 
 /** Read and parse a JSON translation file. Returns {} on any error. */
 function readTranslationFile(filePath: string): Record<string, string> {
@@ -287,12 +314,18 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     // ── Virtual module resolution ─────────────────────────────────────────────
 
     resolveId(id: string) {
+      if (id === LOADER_VIRTUAL) return LOADER_RESOLVED;
       if (id.startsWith(VIRTUAL_PREFIX)) {
         return RESOLVED_PREFIX + id.slice(VIRTUAL_PREFIX.length);
       }
     },
 
     load(id: string) {
+      if (id === LOADER_RESOLVED) {
+        const localeFiles = resolveLocaleFiles(localesDir, root);
+        return generateLoaderCode(localeFiles);
+      }
+
       if (!id.startsWith(RESOLVED_PREFIX)) return;
 
       const locale = id.slice(RESOLVED_PREFIX.length);
@@ -340,6 +373,8 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
             const mod = server.moduleGraph.getModuleById(moduleId);
             if (mod) {
               server.moduleGraph.invalidateModule(mod);
+              const loaderMod = server.moduleGraph.getModuleById(LOADER_RESOLVED);
+              if (loaderMod) server.moduleGraph.invalidateModule(loaderMod);
               server.hot.send({ type: "full-reload" });
             }
             return;

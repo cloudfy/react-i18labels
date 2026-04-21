@@ -65,6 +65,14 @@ export interface I18nVitePluginOptions {
      * @default false
      */
     syncLocales?: "update" | "check" | false;
+    /**
+     * Locale codes to ensure exist as JSON files in `localesDir`.
+     * When `syncLocales` is `"update"` and a listed locale has no file yet,
+     * the plugin creates an empty stub and immediately populates it with all
+     * extracted source strings as untranslated placeholders.
+     * @example ["en", "da", "de"]
+     */
+    locales?: string[];
 }
 export default function i18nLabels(options: I18nVitePluginOptions): Plugin;
 //# sourceMappingURL=vite-plugin.d.ts.map

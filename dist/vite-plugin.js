@@ -26,7 +26,33 @@ import { compileLocale, extractMessages } from "./icu-codegen.js";
 // ─── Constants ────────────────────────────────────────────────────────────────
 const VIRTUAL_PREFIX = "virtual:i18n/";
 const RESOLVED_PREFIX = "\0virtual:i18n/";
+const LOADER_VIRTUAL = "virtual:i18n/loader";
+const LOADER_RESOLVED = "\0virtual:i18n/loader";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+/**
+ * Generate a loader module with one static import per locale.
+ * Vite can rewrite static `import("virtual:i18n/...")` calls correctly;
+ * template-literal dynamic imports resolve to a bare URL which the browser
+ * cannot fetch (CorsDisabledScheme).  This module is the fix.
+ */
+function generateLoaderCode(localeFiles) {
+    const entries = [...localeFiles.keys()]
+        .map((l) => `  ${JSON.stringify(l)}: () => import("virtual:i18n/${l}")`)
+        .join(",\n");
+    return [
+        `const _locales = {`,
+        entries,
+        `};`,
+        `export default function loadLocale(locale) {`,
+        `  const loader = _locales[locale];`,
+        `  if (!loader) {`,
+        `    console.warn('[i18n] No locale module for "' + locale + '"');`,
+        `    return Promise.resolve({ default: {} });`,
+        `  }`,
+        `  return loader();`,
+        `}`,
+    ].join("\n");
+}
 /** Read and parse a JSON translation file. Returns {} on any error. */
 function readTranslationFile(filePath) {
     try {
@@ -115,7 +141,7 @@ function syncLocaleFiles(sourceMessages, localeFiles, mode, root, onError, onInf
 }
 // ─── Plugin ───────────────────────────────────────────────────────────────────
 export default function i18nLabels(options) {
-    const { localesDir, sourceLocale = "en", warnOnMissing = true, emitManifest = false, manifestPath = "dist/i18n-manifest.json", syncLocales = false, } = options;
+    const { localesDir, sourceLocale = "en", warnOnMissing = true, emitManifest = false, manifestPath = "dist/i18n-manifest.json", syncLocales = false, locales: declaredLocales, } = options;
     let root = process.cwd();
     let srcDir = path.join(root, "src");
     // In-memory cache: locale → compiled JS string
@@ -148,6 +174,20 @@ export default function i18nLabels(options) {
         buildStart() {
             if (syncLocales) {
                 const sourceMessages = extractSourceMessages(srcDir);
+                // Bootstrap any declared locale files that don't exist yet
+                if (syncLocales === "update" && declaredLocales?.length) {
+                    const absLocalesDir = path.isAbsolute(localesDir)
+                        ? localesDir
+                        : path.join(root, localesDir);
+                    fs.mkdirSync(absLocalesDir, { recursive: true });
+                    for (const locale of declaredLocales) {
+                        const filePath = path.join(absLocalesDir, `${locale}.json`);
+                        if (!fs.existsSync(filePath)) {
+                            fs.writeFileSync(filePath, "{}\n", "utf-8");
+                            console.info(`[i18n] Created ${path.relative(root, filePath)}`);
+                        }
+                    }
+                }
                 const localeFiles = resolveLocaleFiles(localesDir, root);
                 syncLocaleFiles(sourceMessages, localeFiles, syncLocales, root, (msg) => { throw new Error(msg); }, (msg) => console.info(msg));
             }
@@ -155,11 +195,17 @@ export default function i18nLabels(options) {
         },
         // ── Virtual module resolution ─────────────────────────────────────────────
         resolveId(id) {
+            if (id === LOADER_VIRTUAL)
+                return LOADER_RESOLVED;
             if (id.startsWith(VIRTUAL_PREFIX)) {
                 return RESOLVED_PREFIX + id.slice(VIRTUAL_PREFIX.length);
             }
         },
         load(id) {
+            if (id === LOADER_RESOLVED) {
+                const localeFiles = resolveLocaleFiles(localesDir, root);
+                return generateLoaderCode(localeFiles);
+            }
             if (!id.startsWith(RESOLVED_PREFIX))
                 return;
             const locale = id.slice(RESOLVED_PREFIX.length);
@@ -170,7 +216,7 @@ export default function i18nLabels(options) {
             const localeFiles = resolveLocaleFiles(localesDir, root);
             const filePath = localeFiles.get(locale);
             if (!filePath) {
-                this.warn(`[i18n] No translation file found for locale "${locale}"`);
+                console.warn(`[i18n] No translation file found for locale "${locale}"`);
                 return `export default {};`;
             }
             return compile(locale, filePath);
@@ -197,6 +243,9 @@ export default function i18nLabels(options) {
                         const mod = server.moduleGraph.getModuleById(moduleId);
                         if (mod) {
                             server.moduleGraph.invalidateModule(mod);
+                            const loaderMod = server.moduleGraph.getModuleById(LOADER_RESOLVED);
+                            if (loaderMod)
+                                server.moduleGraph.invalidateModule(loaderMod);
                             server.hot.send({ type: "full-reload" });
                         }
                         return;
