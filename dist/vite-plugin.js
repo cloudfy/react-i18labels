@@ -22,7 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import glob from "fast-glob";
-import { compileLocale, extractMessages } from "./icu-codegen";
+import { compileLocale, extractMessages } from "./icu-codegen.js";
 // ─── Constants ────────────────────────────────────────────────────────────────
 const VIRTUAL_PREFIX = "virtual:i18n/";
 const RESOLVED_PREFIX = "\0virtual:i18n/";

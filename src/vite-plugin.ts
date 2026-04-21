@@ -24,7 +24,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Plugin, ViteDevServer, ResolvedConfig } from "vite";
 import glob from "fast-glob";
-import { compileLocale, extractMessages } from "./icu-codegen";
+import { compileLocale, extractMessages } from "./icu-codegen.js";
 
 // ─── Options ─────────────────────────────────────────────────────────────────
 
