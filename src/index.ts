@@ -1,10 +1,10 @@
 // ─── React runtime ────────────────────────────────────────────────────────────
-export { I18nProvider, useTranslation, T } from "./react";
-export type { I18nProviderProps, I18nConfig, LocaleLoader, TProps } from "./react";
+export { I18nProvider, useTranslation, T } from "./react.js";
+export type { I18nProviderProps, I18nConfig, LocaleLoader, TProps } from "./react.js";
 
 // ─── Locale detection ─────────────────────────────────────────────────────────
-export { detectLocale, persistLocale, clearPersistedLocale, matchLocale } from "./detect";
-export type { DetectLocaleOptions } from "./detect";
+export { detectLocale, persistLocale, clearPersistedLocale, matchLocale } from "./detect.js";
+export type { DetectLocaleOptions } from "./detect.js";
 
 // ─── Formatting ───────────────────────────────────────────────────────────────
 export {
@@ -15,14 +15,14 @@ export {
   formatRelative,
   formatRelativeAuto,
   formatList,
-} from "./format";
-export type { DatePreset, FormatNumberOptions, ListStyle, RelativeUnit } from "./format";
+} from "./format.js";
+export type { DatePreset, FormatNumberOptions, ListStyle, RelativeUnit } from "./format.js";
 
 // ─── Plural resolution ────────────────────────────────────────────────────────
-export { pluralFn, ordinalFn } from "./plural";
+export { pluralFn, ordinalFn } from "./plural.js";
 
 // ─── Build-time compiler ──────────────────────────────────────────────────────
-export { parseICU, isComplex, collectArgs } from "./icu-parser";
-export type { ASTNode, TextNode, ArgNode, PluralNode, PluralCase, SelectNode, SelectCase } from "./icu-parser";
-export { compileMessage, compileLocale } from "./icu-codegen";
-export type { CompiledEntry, TranslationInput, CompiledLocaleModule } from "./icu-codegen";
+export { parseICU, isComplex, collectArgs } from "./icu-parser.js";
+export type { ASTNode, TextNode, ArgNode, PluralNode, PluralCase, SelectNode, SelectCase } from "./icu-parser.js";
+export { compileMessage, compileLocale } from "./icu-codegen.js";
+export type { CompiledEntry, TranslationInput, CompiledLocaleModule } from "./icu-codegen.js";

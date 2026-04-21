@@ -17,7 +17,7 @@
  *
  * This keeps the compiled locale modules ~pure data with tiny inline logic.
  */
-import { collectArgs, isComplex, parseICU } from "./icu-parser";
+import { collectArgs, isComplex, parseICU } from "./icu-parser.js";
 // ─── AST → JS string ─────────────────────────────────────────────────────────
 function emitNodes(nodes, locale) {
     return nodes.map((n) => emitNode(n, locale)).join("");

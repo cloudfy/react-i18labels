@@ -23,7 +23,7 @@ import React, {
   type ReactNode,
 } from "react";
 
-import { pluralFn } from "./plural";
+import { pluralFn } from "./plural.js";
 import {
   formatNumber,
   formatCurrency,
@@ -36,8 +36,8 @@ import {
   type FormatNumberOptions,
   type ListStyle,
   type RelativeUnit,
-} from "./format";
-import { detectLocale, persistLocale, type DetectLocaleOptions } from "./detect";
+} from "./format.js";
+import { detectLocale, persistLocale, type DetectLocaleOptions } from "./detect.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

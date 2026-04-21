@@ -14,9 +14,9 @@ import { Fragment as _Fragment, jsx as _jsx } from "react/jsx-runtime";
  *   <T>               JSX component with rich React children
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, } from "react";
-import { pluralFn } from "./plural";
-import { formatNumber, formatCurrency, formatPercent, formatDate, formatRelative, formatRelativeAuto, formatList, } from "./format";
-import { detectLocale, persistLocale } from "./detect";
+import { pluralFn } from "./plural.js";
+import { formatNumber, formatCurrency, formatPercent, formatDate, formatRelative, formatRelativeAuto, formatList, } from "./format.js";
+import { detectLocale, persistLocale } from "./detect.js";
 // ─── Context ──────────────────────────────────────────────────────────────────
 const I18nContext = createContext(null);
 export function I18nProvider({ config, locale: localeProp, children, fallback }) {

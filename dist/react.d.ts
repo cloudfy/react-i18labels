@@ -13,9 +13,9 @@
  *   <T>               JSX component with rich React children
  */
 import { type ReactNode } from "react";
-import { pluralFn } from "./plural";
-import { formatCurrency, formatPercent, type DatePreset, type FormatNumberOptions, type ListStyle, type RelativeUnit } from "./format";
-import { type DetectLocaleOptions } from "./detect";
+import { pluralFn } from "./plural.js";
+import { formatCurrency, formatPercent, type DatePreset, type FormatNumberOptions, type ListStyle, type RelativeUnit } from "./format.js";
+import { type DetectLocaleOptions } from "./detect.js";
 /** A compiled locale entry: plain string or a function. */
 type MessageEntry = string | ((values: Record<string, unknown>, pf: typeof pluralFn) => string);
 /** Shape of a compiled locale module's default export. */

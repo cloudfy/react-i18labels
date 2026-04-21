@@ -18,7 +18,7 @@
  * This keeps the compiled locale modules ~pure data with tiny inline logic.
  */
 
-import { ASTNode, PluralNode, SelectNode, collectArgs, isComplex, parseICU } from "./icu-parser";
+import { ASTNode, PluralNode, SelectNode, collectArgs, isComplex, parseICU } from "./icu-parser.js";
 
 // ─── AST → JS string ─────────────────────────────────────────────────────────
 
