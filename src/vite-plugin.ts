@@ -307,7 +307,17 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     const translations = readTranslationFile(filePath);
     const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
 
-    const { code, stats } = compileLocale(locale, translations, sourceMessages);
+    let code: string;
+    let stats: ReturnType<typeof compileLocale>["stats"];
+    try {
+      ({ code, stats } = compileLocale(locale, translations, sourceMessages));
+    } catch (err) {
+      const rel = path.relative(root, filePath).replace(/\\/g, "/");
+      throw new Error(
+        `[i18n] Translation compile error in ${rel}\n  ` +
+          (err as Error).message.replace(/\n/g, "\n  "),
+      );
+    }
 
     if (warnOnMissing && stats.missing > 0) {
       console.warn(

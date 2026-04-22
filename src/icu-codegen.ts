@@ -18,7 +18,7 @@
  * This keeps the compiled locale modules ~pure data with tiny inline logic.
  */
 
-import { ASTNode, PluralNode, SelectNode, collectArgs, isComplex, parseICU } from "./icu-parser.js";
+import { ASTNode, PluralNode, SelectNode, collectArgs, detectCommonMistakes, isComplex, parseICU } from "./icu-parser.js";
 
 // ─── AST → JS string ─────────────────────────────────────────────────────────
 
@@ -78,7 +78,19 @@ export type CompiledEntry =
  * string that the locale module will export as an arrow function.
  */
 export function compileMessage(message: string, locale: string): CompiledEntry {
-  const ast = parseICU(message);
+  let ast: ReturnType<typeof parseICU>;
+  try {
+    ast = parseICU(message);
+  } catch (err) {
+    const hint = detectCommonMistakes(message);
+    const truncated = message.length > 80 ? message.slice(0, 80) + "…" : message;
+    const lines = [
+      `ICU parse error in value: ${(err as Error).message}`,
+      `  Value: ${JSON.stringify(truncated)}`,
+    ];
+    if (hint) lines.push(`  Hint:  ${hint}`);
+    throw new Error(lines.join("\n"));
+  }
   const args = [...collectArgs(ast)];
 
   if (!isComplex(ast) && args.length === 0) {
@@ -148,7 +160,19 @@ export function compileLocale(
       continue;
     }
 
-    const compiled = compileMessage(translated, locale);
+    let compiled: ReturnType<typeof compileMessage>;
+    try {
+      compiled = compileMessage(translated, locale);
+    } catch (err) {
+      const truncKey = source.length > 60 ? source.slice(0, 60) + "…" : source;
+      const truncVal = translated.length > 60 ? translated.slice(0, 60) + "…" : translated;
+      throw new Error(
+        `[i18n] Locale "${locale}" — failed to compile translation:\n` +
+        `  Key:   ${JSON.stringify(truncKey)}\n` +
+        `  Value: ${JSON.stringify(truncVal)}\n` +
+        `  ${(err as Error).message.replace(/\n/g, "\n  ")}`,
+      );
+    }
 
     if (compiled.kind === "string") {
       stats.plain++;

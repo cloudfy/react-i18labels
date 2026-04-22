@@ -227,6 +227,19 @@ export function parseICU(message) {
 export function isComplex(ast) {
     return ast.some((n) => n.type === "plural" || n.type === "select");
 }
+/**
+ * Detect common ICU format mistakes in a raw message string.
+ * Returns a human-readable hint, or null when no known mistake is found.
+ */
+export function detectCommonMistakes(message) {
+    // Double-brace interpolation: {{varName}} — used by i18next/mustache, not ICU
+    const doubleBrace = /\{\{([^}]+)\}\}/.exec(message);
+    if (doubleBrace) {
+        const varName = doubleBrace[1].trim();
+        return `Found "{{${varName}}}" — ICU format uses single braces {${varName}}, not double braces. Did you mean "{${varName}}"?`;
+    }
+    return null;
+}
 /** Returns all variable names referenced in an AST (for type generation). */
 export function collectArgs(ast) {
     const args = new Set();

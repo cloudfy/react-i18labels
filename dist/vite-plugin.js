@@ -161,7 +161,10 @@ function ensureLocalesDir(absLocalesDir, declaredLocales, root) {
         }
         const filePath = path.join(absLocalesDir, `${locale}.json`);
         // Guard against path traversal even if the regex were somehow bypassed.
-        if (!path.resolve(filePath).startsWith(path.resolve(absLocalesDir) + path.sep)) {
+        // path.relative() is robust across platforms: if the file escapes the
+        // directory the result starts with ".." or is an absolute path.
+        const rel = path.relative(path.resolve(absLocalesDir), path.resolve(filePath));
+        if (rel.startsWith("..") || path.isAbsolute(rel)) {
             throw new Error(`[i18n] Resolved locale path "${filePath}" escapes the locales directory.`);
         }
         if (!fs.existsSync(filePath)) {
@@ -181,7 +184,16 @@ export default function i18nLabels(options) {
     function compile(locale, filePath) {
         const translations = readTranslationFile(filePath);
         const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
-        const { code, stats } = compileLocale(locale, translations, sourceMessages);
+        let code;
+        let stats;
+        try {
+            ({ code, stats } = compileLocale(locale, translations, sourceMessages));
+        }
+        catch (err) {
+            const rel = path.relative(root, filePath).replace(/\\/g, "/");
+            throw new Error(`[i18n] Translation compile error in ${rel}\n  ` +
+                err.message.replace(/\n/g, "\n  "));
+        }
         if (warnOnMissing && stats.missing > 0) {
             console.warn(`[i18n] Locale "${locale}": ${stats.missing} missing translation(s) out of ${stats.total}`);
         }
@@ -203,9 +215,18 @@ export default function i18nLabels(options) {
             srcDir = path.join(root, "src");
         },
         buildStart() {
-            const absLocalesDir = path.isAbsolute(localesDir)
+            // Derive the concrete directory from localesDir, which may be a plain
+            // directory ("./locales"), a glob ("./src/locales/*.json"), or a direct
+            // JSON path ("./locales/en.json").  Normalize using the same logic as
+            // resolveLocaleFiles, then strip the filename with path.dirname so we
+            // never pass a glob pattern or a .json filename to fs.mkdirSync.
+            const normalizedPattern = localesDir.endsWith(".json")
                 ? localesDir
-                : path.join(root, localesDir);
+                : path.join(localesDir, "*.json");
+            const absPattern = path.isAbsolute(normalizedPattern)
+                ? normalizedPattern
+                : path.join(root, normalizedPattern);
+            const absLocalesDir = path.dirname(absPattern);
             // Only bootstrap the locales directory and declared locale stubs when
             // running in update mode, since this may create files on disk.
             if (syncLocales === "update") {

@@ -45,6 +45,11 @@ export type ASTNode = TextNode | ArgNode | PluralNode | SelectNode;
 export declare function parseICU(message: string): ASTNode[];
 /** Returns true when the AST requires runtime evaluation (plural/select). */
 export declare function isComplex(ast: ASTNode[]): boolean;
+/**
+ * Detect common ICU format mistakes in a raw message string.
+ * Returns a human-readable hint, or null when no known mistake is found.
+ */
+export declare function detectCommonMistakes(message: string): string | null;
 /** Returns all variable names referenced in an AST (for type generation). */
 export declare function collectArgs(ast: ASTNode[]): Set<string>;
 //# sourceMappingURL=icu-parser.d.ts.map
