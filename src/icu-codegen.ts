@@ -78,7 +78,7 @@ export type CompiledEntry =
  * string that the locale module will export as an arrow function.
  */
 export function compileMessage(message: string, locale: string): CompiledEntry {
-  let ast;
+  let ast: ReturnType<typeof parseICU>;
   try {
     ast = parseICU(message);
   } catch (err) {
