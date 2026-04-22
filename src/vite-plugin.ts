@@ -266,7 +266,10 @@ function ensureLocalesDir(
     const filePath = path.join(absLocalesDir, `${locale}.json`);
 
     // Guard against path traversal even if the regex were somehow bypassed.
-    if (!path.resolve(filePath).startsWith(path.resolve(absLocalesDir) + path.sep)) {
+    // path.relative() is robust across platforms: if the file escapes the
+    // directory the result starts with ".." or is an absolute path.
+    const rel = path.relative(path.resolve(absLocalesDir), path.resolve(filePath));
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
       throw new Error(
         `[i18n] Resolved locale path "${filePath}" escapes the locales directory.`,
       );
