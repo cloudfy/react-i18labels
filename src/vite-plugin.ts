@@ -233,6 +233,35 @@ function syncLocaleFiles(
   }
 }
 
+// ─── Bootstrap helper ───────────────────────────────────────────────────────
+
+/**
+ * Ensure the locales directory and any declared locale JSON stubs exist on
+ * disk.  Safe to call unconditionally — directory creation is a no-op when the
+ * folder already exists, and file creation is skipped for locales that already
+ * have a JSON file.
+ */
+function ensureLocalesDir(
+  absLocalesDir: string,
+  declaredLocales: string[] | undefined,
+  root: string,
+): void {
+  if (!fs.existsSync(absLocalesDir)) {
+    fs.mkdirSync(absLocalesDir, { recursive: true });
+    console.info(`[i18n] Created ${path.relative(root, absLocalesDir)}/`);
+  }
+
+  if (!declaredLocales?.length) return;
+
+  for (const locale of declaredLocales) {
+    const filePath = path.join(absLocalesDir, `${locale}.json`);
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, "{}\n", "utf-8");
+      console.info(`[i18n] Created ${path.relative(root, filePath)}`);
+    }
+  }
+}
+
 // ─── Plugin ───────────────────────────────────────────────────────────────────
 
 export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
@@ -288,24 +317,15 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     },
 
     buildStart() {
+      const absLocalesDir = path.isAbsolute(localesDir)
+        ? localesDir
+        : path.join(root, localesDir);
+
+      // Always ensure the locales directory and declared locale stubs exist.
+      ensureLocalesDir(absLocalesDir, declaredLocales, root);
+
       if (syncLocales) {
         const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
-
-        // Bootstrap any declared locale files that don't exist yet
-        if (syncLocales === "update" && declaredLocales?.length) {
-          const absLocalesDir = path.isAbsolute(localesDir)
-            ? localesDir
-            : path.join(root, localesDir);
-          fs.mkdirSync(absLocalesDir, { recursive: true });
-          for (const locale of declaredLocales) {
-            const filePath = path.join(absLocalesDir, `${locale}.json`);
-            if (!fs.existsSync(filePath)) {
-              fs.writeFileSync(filePath, "{}\n", "utf-8");
-              console.info(`[i18n] Created ${path.relative(root, filePath)}`);
-            }
-          }
-        }
-
         const localeFiles = resolveLocaleFiles(localesDir, root);
         syncLocaleFiles(
           sourceMessages,

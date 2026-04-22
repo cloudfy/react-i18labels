@@ -146,10 +146,11 @@ export function extractMessages(source, sep = "-") {
     // Pass 1: collect useTranslation namespace declarations in source order.
     // A call with no argument (or `undefined`) clears the active namespace.
     const nsDeclarations = [];
-    const useTranslationRe = /\buseTranslation\s*\(\s*(?:(['"`])(\w+)\1\s*)?\)/g;
+    const useTranslationRe = /\buseTranslation\s*\(\s*(?:undefined\b\s*|(['"`])((?:(?!\1).|\\.)*)\1\s*)?\)/g;
     let m;
     while ((m = useTranslationRe.exec(source)) !== null) {
-        nsDeclarations.push({ offset: m.index, namespace: m[2] ?? null });
+        const namespace = m[2] != null ? m[2].replace(/\\'/g, "'").replace(/\\"/g, '"') : null;
+        nsDeclarations.push({ offset: m.index, namespace });
     }
     /** Return the active namespace for a given character offset. */
     function nsForOffset(offset) {
