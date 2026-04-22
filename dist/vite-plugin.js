@@ -153,8 +153,17 @@ function ensureLocalesDir(absLocalesDir, declaredLocales, root) {
     }
     if (!declaredLocales?.length)
         return;
+    // RFC 5646-ish: allow letters, digits, and hyphens only (e.g. "en", "zh-Hans", "pt-BR").
+    const SAFE_LOCALE = /^[A-Za-z0-9-]+$/;
     for (const locale of declaredLocales) {
+        if (!SAFE_LOCALE.test(locale)) {
+            throw new Error(`[i18n] Unsafe locale code "${locale}". Locale codes must match /^[A-Za-z0-9-]+$/.`);
+        }
         const filePath = path.join(absLocalesDir, `${locale}.json`);
+        // Guard against path traversal even if the regex were somehow bypassed.
+        if (!path.resolve(filePath).startsWith(path.resolve(absLocalesDir) + path.sep)) {
+            throw new Error(`[i18n] Resolved locale path "${filePath}" escapes the locales directory.`);
+        }
         if (!fs.existsSync(filePath)) {
             fs.writeFileSync(filePath, "{}\n", "utf-8");
             console.info(`[i18n] Created ${path.relative(root, filePath)}`);
@@ -197,8 +206,11 @@ export default function i18nLabels(options) {
             const absLocalesDir = path.isAbsolute(localesDir)
                 ? localesDir
                 : path.join(root, localesDir);
-            // Always ensure the locales directory and declared locale stubs exist.
-            ensureLocalesDir(absLocalesDir, declaredLocales, root);
+            // Only bootstrap the locales directory and declared locale stubs when
+            // running in update mode, since this may create files on disk.
+            if (syncLocales === "update") {
+                ensureLocalesDir(absLocalesDir, declaredLocales, root);
+            }
             if (syncLocales) {
                 const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
                 const localeFiles = resolveLocaleFiles(localesDir, root);
