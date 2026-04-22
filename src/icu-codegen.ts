@@ -160,7 +160,7 @@ export function compileLocale(
       continue;
     }
 
-    let compiled;
+    let compiled: ReturnType<typeof compileMessage>;
     try {
       compiled = compileMessage(translated, locale);
     } catch (err) {
