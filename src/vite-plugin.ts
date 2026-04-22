@@ -337,9 +337,18 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     },
 
     buildStart() {
-      const absLocalesDir = path.isAbsolute(localesDir)
+      // Derive the concrete directory from localesDir, which may be a plain
+      // directory ("./locales"), a glob ("./src/locales/*.json"), or a direct
+      // JSON path ("./locales/en.json").  Normalize using the same logic as
+      // resolveLocaleFiles, then strip the filename with path.dirname so we
+      // never pass a glob pattern or a .json filename to fs.mkdirSync.
+      const normalizedPattern = localesDir.endsWith(".json")
         ? localesDir
-        : path.join(root, localesDir);
+        : path.join(localesDir, "*.json");
+      const absPattern = path.isAbsolute(normalizedPattern)
+        ? normalizedPattern
+        : path.join(root, normalizedPattern);
+      const absLocalesDir = path.dirname(absPattern);
 
       // Only bootstrap the locales directory and declared locale stubs when
       // running in update mode, since this may create files on disk.
