@@ -14,6 +14,7 @@
  */
 import { type ReactNode } from "react";
 import { pluralFn } from "./plural.js";
+import { formatCurrency, formatPercent, type DatePreset, type FormatNumberOptions, type ListStyle, type RelativeUnit } from "./format.js";
 import { type DetectLocaleOptions } from "./detect.js";
 /** A compiled locale entry: plain string or a function. */
 type MessageEntry = string | ((values: Record<string, unknown>, pf: typeof pluralFn) => string);
@@ -52,18 +53,18 @@ export interface I18nProviderProps {
     /** Optional fallback UI while the locale module loads. */
     fallback?: ReactNode;
 }
-export declare function I18nProvider({ config, locale: localeProp, children, fallback }: I18nProviderProps): any;
+export declare function I18nProvider({ config, locale: localeProp, children, fallback }: I18nProviderProps): import("react/jsx-runtime").JSX.Element;
 export declare function useTranslation(namespace?: string): {
-    t: any;
-    locale: any;
-    setLocale: any;
-    formatNumber: any;
-    formatCurrency: any;
-    formatPercent: any;
-    formatDate: any;
-    formatRelative: any;
-    formatRelativeAuto: any;
-    formatList: any;
+    t: (source: string, values?: Record<string, unknown>) => string;
+    locale: string;
+    setLocale: (locale: string) => void;
+    formatNumber: (value: number, options?: FormatNumberOptions) => string;
+    formatCurrency: (value: number, currencyCode: string, options?: Parameters<typeof formatCurrency>[3]) => string;
+    formatPercent: (value: number, options?: Parameters<typeof formatPercent>[2]) => string;
+    formatDate: (value: Date | string | number, format?: DatePreset | Intl.DateTimeFormatOptions) => string;
+    formatRelative: (value: number, unit: RelativeUnit, style?: Intl.RelativeTimeFormatStyle) => string;
+    formatRelativeAuto: (value: Date | string | number, style?: Intl.RelativeTimeFormatStyle) => string;
+    formatList: (items: string[], style?: ListStyle) => string;
 };
 /**
  * Translate a string in JSX with optional interpolated React nodes.

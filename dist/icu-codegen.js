@@ -17,7 +17,7 @@
  *
  * This keeps the compiled locale modules ~pure data with tiny inline logic.
  */
-import { collectArgs, isComplex, parseICU } from "./icu-parser.js";
+import { collectArgs, detectCommonMistakes, isComplex, parseICU } from "./icu-parser.js";
 // ─── AST → JS string ─────────────────────────────────────────────────────────
 function emitNodes(nodes, locale) {
     return nodes.map((n) => emitNode(n, locale)).join("");
@@ -65,7 +65,21 @@ function emitSelect(node, locale) {
  * string that the locale module will export as an arrow function.
  */
 export function compileMessage(message, locale) {
-    const ast = parseICU(message);
+    let ast;
+    try {
+        ast = parseICU(message);
+    }
+    catch (err) {
+        const hint = detectCommonMistakes(message);
+        const truncated = message.length > 80 ? message.slice(0, 80) + "…" : message;
+        const lines = [
+            `ICU parse error in value: ${err.message}`,
+            `  Value: ${JSON.stringify(truncated)}`,
+        ];
+        if (hint)
+            lines.push(`  Hint:  ${hint}`);
+        throw new Error(lines.join("\n"));
+    }
     const args = [...collectArgs(ast)];
     if (!isComplex(ast) && args.length === 0) {
         // Pure text — no function needed
@@ -104,7 +118,18 @@ export function compileLocale(locale, translations, sourceMessages) {
             entries.push(`  ${JSON.stringify(source)}: ${JSON.stringify(source)}`);
             continue;
         }
-        const compiled = compileMessage(translated, locale);
+        let compiled;
+        try {
+            compiled = compileMessage(translated, locale);
+        }
+        catch (err) {
+            const truncKey = source.length > 60 ? source.slice(0, 60) + "…" : source;
+            const truncVal = translated.length > 60 ? translated.slice(0, 60) + "…" : translated;
+            throw new Error(`[i18n] Locale "${locale}" — failed to compile translation:\n` +
+                `  Key:   ${JSON.stringify(truncKey)}\n` +
+                `  Value: ${JSON.stringify(truncVal)}\n` +
+                `  ${err.message.replace(/\n/g, "\n  ")}`);
+        }
         if (compiled.kind === "string") {
             stats.plain++;
             entries.push(`  ${JSON.stringify(source)}: ${JSON.stringify(compiled.value)}`);
