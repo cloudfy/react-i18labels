@@ -87,13 +87,13 @@ function resolveLocaleFiles(localesDir, root) {
  * Scan TypeScript/TSX source files under `srcDir` and extract source strings.
  * Falls back to an empty array when no source files exist yet.
  */
-function extractSourceMessages(srcDir) {
+function extractSourceMessages(srcDir, sep) {
     const files = glob.sync(path.join(srcDir, "**/*.{ts,tsx}").replace(/\\/g, "/"));
     const messages = new Set();
     for (const file of files) {
         try {
             const src = fs.readFileSync(file, "utf-8");
-            for (const msg of extractMessages(src)) {
+            for (const msg of extractMessages(src, sep)) {
                 messages.add(msg);
             }
         }
@@ -141,7 +141,7 @@ function syncLocaleFiles(sourceMessages, localeFiles, mode, root, onError, onInf
 }
 // ─── Plugin ───────────────────────────────────────────────────────────────────
 export default function i18nLabels(options) {
-    const { localesDir, sourceLocale = "en", warnOnMissing = true, emitManifest = false, manifestPath = "dist/i18n-manifest.json", syncLocales = false, locales: declaredLocales, } = options;
+    const { localesDir, sourceLocale = "en", warnOnMissing = true, emitManifest = false, manifestPath = "dist/i18n-manifest.json", syncLocales = false, locales: declaredLocales, namespaceSeparator = "-", } = options;
     let root = process.cwd();
     let srcDir = path.join(root, "src");
     // In-memory cache: locale → compiled JS string
@@ -149,7 +149,7 @@ export default function i18nLabels(options) {
     /** Compile (or recompile) a single locale and update the cache. */
     function compile(locale, filePath) {
         const translations = readTranslationFile(filePath);
-        const sourceMessages = extractSourceMessages(srcDir);
+        const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
         const { code, stats } = compileLocale(locale, translations, sourceMessages);
         if (warnOnMissing && stats.missing > 0) {
             console.warn(`[i18n] Locale "${locale}": ${stats.missing} missing translation(s) out of ${stats.total}`);
@@ -173,7 +173,7 @@ export default function i18nLabels(options) {
         },
         buildStart() {
             if (syncLocales) {
-                const sourceMessages = extractSourceMessages(srcDir);
+                const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
                 // Bootstrap any declared locale files that don't exist yet
                 if (syncLocales === "update" && declaredLocales?.length) {
                     const absLocalesDir = path.isAbsolute(localesDir)
@@ -253,7 +253,7 @@ export default function i18nLabels(options) {
                 }
                 // ── A source file changed — sync new keys then recompile ─────────────
                 if (syncLocales === "update" && /\.(tsx?)$/.test(changedPath)) {
-                    const sourceMessages = extractSourceMessages(srcDir);
+                    const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
                     syncLocaleFiles(sourceMessages, currentLocaleFiles, "update", root, (msg) => console.error(msg), (msg) => console.info(msg));
                     // Recompile all locales (JSON files may have been updated on disk)
                     for (const [locale, filePath] of currentLocaleFiles) {
@@ -267,7 +267,7 @@ export default function i18nLabels(options) {
         generateBundle() {
             if (!emitManifest)
                 return;
-            const sourceMessages = extractSourceMessages(srcDir);
+            const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
             const localeFiles = resolveLocaleFiles(localesDir, root);
             const localeStats = {};
             for (const [locale, filePath] of localeFiles) {

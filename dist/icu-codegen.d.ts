@@ -65,6 +65,11 @@ export declare function compileLocale(locale: string, translations: TranslationI
  * used as children of <T>.  This is a lightweight regex pass — the Vite
  * plugin uses ts-morph for full AST extraction, but this covers 95 % of
  * real-world patterns for a standalone CLI.
+ *
+ * When a `useTranslation("namespace")` call precedes a `t("key")` call (or a
+ * subsequent `useTranslation()` / `useTranslation(undefined)` resets it), the
+ * extracted key is prefixed: `namespace{sep}key`.  Likewise, `<T ns="ns">`
+ * emits a prefixed key.  The separator defaults to `"-"`.
  */
-export declare function extractMessages(source: string): string[];
+export declare function extractMessages(source: string, sep?: string): string[];
 //# sourceMappingURL=icu-codegen.d.ts.map
