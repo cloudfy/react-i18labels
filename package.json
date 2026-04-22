@@ -27,10 +27,14 @@
         "./vite-plugin": {
             "import": "./dist/vite-plugin.js",
             "types": "./dist/vite-plugin.d.ts"
+        },
+        "./client": {
+            "types": "./client.d.ts"
         }
     },
     "files": [
         "dist",
+        "client.d.ts",
         "README.md"
     ],
     "sideEffects": false,
