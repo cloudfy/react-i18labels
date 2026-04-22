@@ -73,6 +73,14 @@ export interface I18nVitePluginOptions {
      * @example ["en", "da", "de"]
      */
     locales?: string[];
+    /**
+     * Separator placed between a namespace and a translation key when using
+     * namespaced `useTranslation("namespace")` or `<T ns="namespace">`.
+     * Must match the `namespaceSeparator` option in your `I18nConfig`.
+     * @default "-"
+     * @example namespaceSeparator: ":" → key becomes "admin:Settings"
+     */
+    namespaceSeparator?: string;
 }
 export default function i18nLabels(options: I18nVitePluginOptions): Plugin;
 //# sourceMappingURL=vite-plugin.d.ts.map

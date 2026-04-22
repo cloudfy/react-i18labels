@@ -59,6 +59,13 @@ export interface I18nConfig extends DetectLocaleOptions {
    */
   warnOnMissing?: boolean;
   /**
+   * Separator used between a namespace and a translation key.
+   * Must match the `namespaceSeparator` option in the Vite plugin.
+   * @default "-"
+   * @example namespaceSeparator: ":" → key becomes "admin:Settings"
+   */
+  namespaceSeparator?: string;
+  /**
    * Translator context comment — attached to the message in the manifest
    * so translators understand ambiguous strings.  Not used at runtime.
    */
@@ -135,21 +142,23 @@ export function I18nProvider({ config, locale: localeProp, children, fallback }:
 
 const isDev = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !== "production";
 
-export function useTranslation() {
+export function useTranslation(namespace?: string) {
   const ctx = useContext(I18nContext);
   if (!ctx) throw new Error("useTranslation must be used inside <I18nProvider>");
 
   const { locale, messages, config } = ctx;
   const warnOnMissing = config.warnOnMissing ?? isDev;
+  const sep = config.namespaceSeparator ?? "-";
 
   /** Translate a source string, optionally with interpolation values. */
   const t = useCallback(
     (source: string, values?: Record<string, unknown>): string => {
-      const entry = messages[source];
+      const key = namespace ? `${namespace}${sep}${source}` : source;
+      const entry = messages[key];
 
       if (entry === undefined) {
         if (warnOnMissing) {
-          console.warn(`[i18n] Missing translation for locale "${locale}": ${JSON.stringify(source)}`);
+          console.warn(`[i18n] Missing translation for locale "${locale}": ${JSON.stringify(key)}`);
         }
         // Graceful fallback: interpolate the source text as-is
         if (!values) return source;
@@ -159,7 +168,7 @@ export function useTranslation() {
       if (typeof entry === "string") return entry;
       return entry(values ?? {}, pluralFn);
     },
-    [locale, messages, warnOnMissing],
+    [locale, messages, warnOnMissing, namespace, sep],
   );
 
   // ── Formatting convenience functions ────────────────────────────────────────
@@ -231,18 +240,22 @@ export function useTranslation() {
  */
 export interface TProps {
   children: string;
+  /** Optional namespace prefix. The lookup key becomes `{ns}{separator}{children}`. */
+  ns?: string;
   [interpolation: string]: ReactNode;
 }
 
-export function T({ children, ...values }: TProps): ReactNode {
-  const { locale, messages } = (() => {
+export function T({ children, ns, ...values }: TProps): ReactNode {
+  const { locale, messages, config } = (() => {
     const ctx = useContext(I18nContext);
     if (!ctx) throw new Error("<T> must be used inside <I18nProvider>");
     return ctx;
   })();
 
+  const sep = config.namespaceSeparator ?? "-";
   const source = children;
-  const entry = messages[source];
+  const key = ns ? `${ns}${sep}${source}` : source;
+  const entry = messages[key];
   const warnOnMissing = isDev;
 
   // Separate string values from React node values
@@ -262,7 +275,7 @@ export function T({ children, ...values }: TProps): ReactNode {
   // Fast path: no React node interpolation
   if (!hasReactValues) {
     if (entry === undefined) {
-      if (warnOnMissing) console.warn(`[i18n] Missing: ${JSON.stringify(source)}`);
+      if (warnOnMissing) console.warn(`[i18n] Missing: ${JSON.stringify(key)}`);
       return source;
     }
     const translated = typeof entry === "string" ? entry : entry(stringValues, pluralFn);

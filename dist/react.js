@@ -50,18 +50,20 @@ export function I18nProvider({ config, locale: localeProp, children, fallback })
 }
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 const isDev = globalThis.process?.env?.NODE_ENV !== "production";
-export function useTranslation() {
+export function useTranslation(namespace) {
     const ctx = useContext(I18nContext);
     if (!ctx)
         throw new Error("useTranslation must be used inside <I18nProvider>");
     const { locale, messages, config } = ctx;
     const warnOnMissing = config.warnOnMissing ?? isDev;
+    const sep = config.namespaceSeparator ?? "-";
     /** Translate a source string, optionally with interpolation values. */
     const t = useCallback((source, values) => {
-        const entry = messages[source];
+        const key = namespace ? `${namespace}${sep}${source}` : source;
+        const entry = messages[key];
         if (entry === undefined) {
             if (warnOnMissing) {
-                console.warn(`[i18n] Missing translation for locale "${locale}": ${JSON.stringify(source)}`);
+                console.warn(`[i18n] Missing translation for locale "${locale}": ${JSON.stringify(key)}`);
             }
             // Graceful fallback: interpolate the source text as-is
             if (!values)
@@ -71,7 +73,7 @@ export function useTranslation() {
         if (typeof entry === "string")
             return entry;
         return entry(values ?? {}, pluralFn);
-    }, [locale, messages, warnOnMissing]);
+    }, [locale, messages, warnOnMissing, namespace, sep]);
     // ── Formatting convenience functions ────────────────────────────────────────
     const number = useCallback((value, options) => formatNumber(value, locale, options), [locale]);
     const currency = useCallback((value, currencyCode, options) => formatCurrency(value, currencyCode, locale, options), [locale]);
@@ -94,15 +96,17 @@ export function useTranslation() {
         formatList: list,
     };
 }
-export function T({ children, ...values }) {
-    const { locale, messages } = (() => {
+export function T({ children, ns, ...values }) {
+    const { locale, messages, config } = (() => {
         const ctx = useContext(I18nContext);
         if (!ctx)
             throw new Error("<T> must be used inside <I18nProvider>");
         return ctx;
     })();
+    const sep = config.namespaceSeparator ?? "-";
     const source = children;
-    const entry = messages[source];
+    const key = ns ? `${ns}${sep}${source}` : source;
+    const entry = messages[key];
     const warnOnMissing = isDev;
     // Separate string values from React node values
     const stringValues = {};
@@ -120,7 +124,7 @@ export function T({ children, ...values }) {
     if (!hasReactValues) {
         if (entry === undefined) {
             if (warnOnMissing)
-                console.warn(`[i18n] Missing: ${JSON.stringify(source)}`);
+                console.warn(`[i18n] Missing: ${JSON.stringify(key)}`);
             return source;
         }
         const translated = typeof entry === "string" ? entry : entry(stringValues, pluralFn);

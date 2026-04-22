@@ -33,6 +33,13 @@ export interface I18nConfig extends DetectLocaleOptions {
      */
     warnOnMissing?: boolean;
     /**
+     * Separator used between a namespace and a translation key.
+     * Must match the `namespaceSeparator` option in the Vite plugin.
+     * @default "-"
+     * @example namespaceSeparator: ":" → key becomes "admin:Settings"
+     */
+    namespaceSeparator?: string;
+    /**
      * Translator context comment — attached to the message in the manifest
      * so translators understand ambiguous strings.  Not used at runtime.
      */
@@ -47,7 +54,7 @@ export interface I18nProviderProps {
     fallback?: ReactNode;
 }
 export declare function I18nProvider({ config, locale: localeProp, children, fallback }: I18nProviderProps): import("react/jsx-runtime").JSX.Element;
-export declare function useTranslation(): {
+export declare function useTranslation(namespace?: string): {
     t: (source: string, values?: Record<string, unknown>) => string;
     locale: string;
     setLocale: (locale: string) => void;
@@ -75,9 +82,11 @@ export declare function useTranslation(): {
  */
 export interface TProps {
     children: string;
+    /** Optional namespace prefix. The lookup key becomes `{ns}{separator}{children}`. */
+    ns?: string;
     [interpolation: string]: ReactNode;
 }
-export declare function T({ children, ...values }: TProps): ReactNode;
+export declare function T({ children, ns, ...values }: TProps): ReactNode;
 /**
  * Translate a string outside React (e.g. in Zod schemas, error constants).
  * Requires passing the messages map explicitly — use sparingly.

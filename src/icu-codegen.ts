@@ -182,21 +182,52 @@ export function compileLocale(
  * used as children of <T>.  This is a lightweight regex pass — the Vite
  * plugin uses ts-morph for full AST extraction, but this covers 95 % of
  * real-world patterns for a standalone CLI.
+ *
+ * When a `useTranslation("namespace")` call precedes a `t("key")` call (or a
+ * subsequent `useTranslation()` / `useTranslation(undefined)` resets it), the
+ * extracted key is prefixed: `namespace{sep}key`.  Likewise, `<T ns="ns">`
+ * emits a prefixed key.  The separator defaults to `"-"`.
  */
-export function extractMessages(source: string): string[] {
+export function extractMessages(source: string, sep = "-"): string[] {
   const messages = new Set<string>();
 
-  // t('...') and t("...") — including template tag t`...`
-  const tCallRe = /\bt\(\s*(['"`])((?:(?!\1).|\\.)*)\1/g;
+  // Pass 1: collect useTranslation namespace declarations in source order.
+  // A call with no argument (or `undefined`) clears the active namespace.
+  const nsDeclarations: Array<{ offset: number; namespace: string | null }> = [];
+  const useTranslationRe = /\buseTranslation\s*\(\s*(?:undefined\b\s*|(['"`])((?:(?!\1).|\\.)*)\1\s*)?\)/g;
   let m: RegExpExecArray | null;
-  while ((m = tCallRe.exec(source)) !== null) {
-    messages.add(m[2].replace(/\\'/g, "'").replace(/\\"/g, '"'));
+  while ((m = useTranslationRe.exec(source)) !== null) {
+    const namespace = m[2] != null ? m[2].replace(/\\'/g, "'").replace(/\\"/g, '"') : null;
+    nsDeclarations.push({ offset: m.index, namespace });
   }
 
-  // <T>...</T> — captures simple text children (no JSX inside)
-  const tJsxRe = /<T(?:\s[^>]*)?>([^<{]+)<\/T>/g;
+  /** Return the active namespace for a given character offset. */
+  function nsForOffset(offset: number): string | null {
+    let best: string | null = null;
+    for (const decl of nsDeclarations) {
+      if (decl.offset < offset) best = decl.namespace;
+      else break;
+    }
+    return best;
+  }
+
+  // Pass 2: t('...') and t("...") — including template tag t`...`
+  const tCallRe = /\bt\(\s*(['"`])((?:(?!\1).|\\.)*)\1/g;
+  while ((m = tCallRe.exec(source)) !== null) {
+    const raw = m[2].replace(/\\'/g, "'").replace(/\\"/g, '"');
+    const ns = nsForOffset(m.index);
+    messages.add(ns ? `${ns}${sep}${raw}` : raw);
+  }
+
+  // Pass 3: <T> JSX — captures attributes (m[1]) and simple text child (m[2]).
+  // Handles <T>text</T> and <T ns="admin">text</T>.
+  const tJsxRe = /<T(\s[^>]*)?>([^<{]+)<\/T>/g;
   while ((m = tJsxRe.exec(source)) !== null) {
-    messages.add(m[1].trim());
+    const text = m[2].trim();
+    if (!text) continue;
+    const attrs = m[1] ?? "";
+    const nsMatch = attrs.match(/\bns=["']([^"']+)["']/);
+    messages.add(nsMatch ? `${nsMatch[1]}${sep}${text}` : text);
   }
 
   return [...messages].filter(Boolean);
