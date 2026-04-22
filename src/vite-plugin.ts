@@ -233,6 +233,55 @@ function syncLocaleFiles(
   }
 }
 
+// ─── Bootstrap helper ───────────────────────────────────────────────────────
+
+/**
+ * Ensure the locales directory and any declared locale JSON stubs exist on
+ * disk.  Safe to call unconditionally — directory creation is a no-op when the
+ * folder already exists, and file creation is skipped for locales that already
+ * have a JSON file.
+ */
+function ensureLocalesDir(
+  absLocalesDir: string,
+  declaredLocales: string[] | undefined,
+  root: string,
+): void {
+  if (!fs.existsSync(absLocalesDir)) {
+    fs.mkdirSync(absLocalesDir, { recursive: true });
+    console.info(`[i18n] Created ${path.relative(root, absLocalesDir)}/`);
+  }
+
+  if (!declaredLocales?.length) return;
+
+  // RFC 5646-ish: allow letters, digits, and hyphens only (e.g. "en", "zh-Hans", "pt-BR").
+  const SAFE_LOCALE = /^[A-Za-z0-9-]+$/;
+
+  for (const locale of declaredLocales) {
+    if (!SAFE_LOCALE.test(locale)) {
+      throw new Error(
+        `[i18n] Unsafe locale code "${locale}". Locale codes must match /^[A-Za-z0-9-]+$/.`,
+      );
+    }
+
+    const filePath = path.join(absLocalesDir, `${locale}.json`);
+
+    // Guard against path traversal even if the regex were somehow bypassed.
+    // path.relative() is robust across platforms: if the file escapes the
+    // directory the result starts with ".." or is an absolute path.
+    const rel = path.relative(path.resolve(absLocalesDir), path.resolve(filePath));
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
+      throw new Error(
+        `[i18n] Resolved locale path "${filePath}" escapes the locales directory.`,
+      );
+    }
+
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, "{}\n", "utf-8");
+      console.info(`[i18n] Created ${path.relative(root, filePath)}`);
+    }
+  }
+}
+
 // ─── Plugin ───────────────────────────────────────────────────────────────────
 
 export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
@@ -288,24 +337,27 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     },
 
     buildStart() {
+      // Derive the concrete directory from localesDir, which may be a plain
+      // directory ("./locales"), a glob ("./src/locales/*.json"), or a direct
+      // JSON path ("./locales/en.json").  Normalize using the same logic as
+      // resolveLocaleFiles, then strip the filename with path.dirname so we
+      // never pass a glob pattern or a .json filename to fs.mkdirSync.
+      const normalizedPattern = localesDir.endsWith(".json")
+        ? localesDir
+        : path.join(localesDir, "*.json");
+      const absPattern = path.isAbsolute(normalizedPattern)
+        ? normalizedPattern
+        : path.join(root, normalizedPattern);
+      const absLocalesDir = path.dirname(absPattern);
+
+      // Only bootstrap the locales directory and declared locale stubs when
+      // running in update mode, since this may create files on disk.
+      if (syncLocales === "update") {
+        ensureLocalesDir(absLocalesDir, declaredLocales, root);
+      }
+
       if (syncLocales) {
         const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
-
-        // Bootstrap any declared locale files that don't exist yet
-        if (syncLocales === "update" && declaredLocales?.length) {
-          const absLocalesDir = path.isAbsolute(localesDir)
-            ? localesDir
-            : path.join(root, localesDir);
-          fs.mkdirSync(absLocalesDir, { recursive: true });
-          for (const locale of declaredLocales) {
-            const filePath = path.join(absLocalesDir, `${locale}.json`);
-            if (!fs.existsSync(filePath)) {
-              fs.writeFileSync(filePath, "{}\n", "utf-8");
-              console.info(`[i18n] Created ${path.relative(root, filePath)}`);
-            }
-          }
-        }
-
         const localeFiles = resolveLocaleFiles(localesDir, root);
         syncLocaleFiles(
           sourceMessages,
