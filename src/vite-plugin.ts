@@ -321,8 +321,11 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
         ? localesDir
         : path.join(root, localesDir);
 
-      // Always ensure the locales directory and declared locale stubs exist.
-      ensureLocalesDir(absLocalesDir, declaredLocales, root);
+      // Only bootstrap the locales directory and declared locale stubs when
+      // running in update mode, since this may create files on disk.
+      if (syncLocales === "update") {
+        ensureLocalesDir(absLocalesDir, declaredLocales, root);
+      }
 
       if (syncLocales) {
         const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
