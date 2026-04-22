@@ -81,6 +81,14 @@ export interface I18nVitePluginOptions {
    * @example ["en", "da", "de"]
    */
   locales?: string[];
+  /**
+   * Separator placed between a namespace and a translation key when using
+   * namespaced `useTranslation("namespace")` or `<T ns="namespace">`.
+   * Must match the `namespaceSeparator` option in your `I18nConfig`.
+   * @default "-"
+   * @example namespaceSeparator: ":" → key becomes "admin:Settings"
+   */
+  namespaceSeparator?: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -155,13 +163,13 @@ function resolveLocaleFiles(localesDir: string, root: string): Map<string, strin
  * Scan TypeScript/TSX source files under `srcDir` and extract source strings.
  * Falls back to an empty array when no source files exist yet.
  */
-function extractSourceMessages(srcDir: string): string[] {
+function extractSourceMessages(srcDir: string, sep: string): string[] {
   const files = glob.sync(path.join(srcDir, "**/*.{ts,tsx}").replace(/\\/g, "/"));
   const messages = new Set<string>();
   for (const file of files) {
     try {
       const src = fs.readFileSync(file, "utf-8");
-      for (const msg of extractMessages(src)) {
+      for (const msg of extractMessages(src, sep)) {
         messages.add(msg);
       }
     } catch {
@@ -236,6 +244,7 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     manifestPath = "dist/i18n-manifest.json",
     syncLocales = false,
     locales: declaredLocales,
+    namespaceSeparator = "-",
   } = options;
 
   let root = process.cwd();
@@ -247,7 +256,7 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
   /** Compile (or recompile) a single locale and update the cache. */
   function compile(locale: string, filePath: string): string {
     const translations = readTranslationFile(filePath);
-    const sourceMessages = extractSourceMessages(srcDir);
+    const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
 
     const { code, stats } = compileLocale(locale, translations, sourceMessages);
 
@@ -280,7 +289,7 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
 
         buildStart() {
       if (syncLocales) {
-        const sourceMessages = extractSourceMessages(srcDir);
+        const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
 
         // Bootstrap any declared locale files that don't exist yet
         if (syncLocales === "update" && declaredLocales?.length) {
@@ -383,7 +392,7 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
 
         // ── A source file changed — sync new keys then recompile ─────────────
         if (syncLocales === "update" && /\.(tsx?)$/.test(changedPath)) {
-          const sourceMessages = extractSourceMessages(srcDir);
+          const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
           syncLocaleFiles(
             sourceMessages,
             currentLocaleFiles,
@@ -406,7 +415,7 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
     generateBundle() {
       if (!emitManifest) return;
 
-      const sourceMessages = extractSourceMessages(srcDir);
+      const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
       const localeFiles = resolveLocaleFiles(localesDir, root);
 
       const localeStats: Record<string, { total: number; missing: number }> = {};
