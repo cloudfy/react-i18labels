@@ -287,7 +287,7 @@ export default function i18nLabels(options: I18nVitePluginOptions): Plugin {
       srcDir = path.join(root, "src");
     },
 
-        buildStart() {
+    buildStart() {
       if (syncLocales) {
         const sourceMessages = extractSourceMessages(srcDir, namespaceSeparator);
 
